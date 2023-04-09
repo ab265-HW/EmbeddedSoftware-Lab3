@@ -8,6 +8,10 @@
 #define PWM_Out_Pin 15 //Actual Pin Selected
 
 
+int const reqSamples = 4;
+int readSamplesCount = 0;
+int readSamples[reqSamples];
+
 struct FreqTaskDesc {
   int minFreq;
   int maxFreq;
@@ -63,13 +67,13 @@ void task1(void *Ptr){
 
   for( ;; )
     {
-      digitalWrite(Output_Pin_2, HIGH);
+      digitalWrite(Output_Pin_1, HIGH);
       delayMicroseconds(200);
-      digitalWrite(Output_Pin_2,LOW);
+      digitalWrite(Output_Pin_1,LOW);
       delayMicroseconds(50);
-      digitalWrite(Output_Pin_2,HIGH);
+      digitalWrite(Output_Pin_1,HIGH);
       delayMicroseconds(30);
-      digitalWrite(Output_Pin_2,LOW);
+      digitalWrite(Output_Pin_1,LOW);
       vTaskDelayUntil(&lastWake,period);
     }
 }
@@ -114,6 +118,39 @@ void task3(void *freqResultsPtr){
       if (halfWaveLengthMicro <= 0) {(taskDescPtr->measuredFreq) = 0;}
       else {int WaveLengthMicro = 2*halfWaveLengthMicro;(taskDescPtr->measuredFreq) = 1000000/WaveLengthMicro;}
       Serial.println("Task3 Frequency is: " + String(globalFreqResults.task3Desc.measuredFreq));
+      vTaskDelayUntil(&lastWake,period);
+    }
+}
+
+void task4(void *Ptr) {
+
+  TickType_t lastWake = xTaskGetTickCount();
+  const TickType_t period = 500/portTICK_PERIOD_MS;
+
+    for( ;; )
+    {
+      if( readSamplesCount == 2*reqSamples) { readSamplesCount == reqSamples; }
+    
+      int i = readSamplesCount % reqSamples;
+      readSamples[i]= analogRead(Input_Pin_1);
+      readSamplesCount++;
+    
+      //Averaging Code
+      int averageValue = 0;
+      //this computes the Average before enough readings have been taken to fill the cyclic buffer
+      if (readSamplesCount < reqSamples) {
+        for (int i = 0; i< readSamplesCount; i++) { averageValue += readSamples[i]; }
+        averageValue = averageValue/readSamplesCount;
+      }
+      //this computes the average when the cyclic buffer has been filled
+      else {
+        for (int i = 0; i<reqSamples; i++) { averageValue += readSamples[i]; }
+        averageValue = averageValue/reqSamples;
+      }
+    
+      //if the average value is half of the maximum allowed analog read value, then output a high signal on the Output pin otherwise, output a Low signal
+      if(averageValue > 2047) { digitalWrite(Output_Pin_2,HIGH);}
+      else{ digitalWrite(Output_Pin_2,LOW);}
       vTaskDelayUntil(&lastWake,period);
     }
 }
